@@ -31,9 +31,9 @@
             this.textureUrl,
             (texture) => {
               // Optional: Adjust texture settings
-              texture.minFilter = THREE.LinearFilter;
-              texture.magFilter = THREE.LinearFilter;
-              texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+              texture.minFilter = THREE.NearestFilter;
+              texture.magFilter = THREE.NearestFilter;
+              texture.anisotropy = Math.max(8, this.renderer.capabilities.getMaxAnisotropy());
 
               const geometry = new THREE.BoxGeometry(1, 1, 1);
 
