@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Azure Logos with Inner Cube and Dashed Line</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Include Three.js via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Data structure defining entities and connections
+    const data = {
+      entities: [
+        {
+          id: '1',
+          name: 'Resource 1',
+          position: { x: -1.5, y: 0, z: 0 },
+          textureUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Microsoft_Azure_Logo.svg'
+        },
+        {
+          id: '2',
+          name: 'Resource 2',
+          position: { x: 1.5, y: 0, z: 0 },
+          textureUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Microsoft_Azure_Logo.svg'
+        }
+      ],
+      connections: [
+        { from: '1', to: '2' }
+      ]
+    };
+
+    // Set up the scene
+    const scene = new THREE.Scene();
+
+    // Set the scene background to white
+    scene.background = new THREE.Color(0xffffff);
+
+    // Set up the renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Create an isometric camera
+    const aspect = window.innerWidth / window.innerHeight;
+    const d = 4; // Controls the zoom level
+    const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+
+    // Position the camera for an isometric view
+    camera.position.set(5, 5, 5);
+    camera.lookAt(0, 0, 0);
+
+    // Add a light source
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
+
+    // Store entity objects for easy access
+    const entityObjects = {};
+
+    // Function to create a dashed cylinder between two points
+    function createDashedLineBetweenPoints(pointA, pointB, dashSize, gapSize, radius, material) {
+      const direction = new THREE.Vector3().subVectors(pointB, pointA);
+      const totalLength = direction.length();
+      direction.normalize();
+
+      const numberOfDashes = Math.floor(totalLength / (dashSize + gapSize));
+      const dashLength = dashSize;
+      const gapLength = gapSize;
+
+      const dashedCylinders = new THREE.Group();
+
+      let currentLength = 0;
+
+      while (currentLength < totalLength) {
+        const startLength = currentLength;
+        const endLength = Math.min(currentLength + dashLength, totalLength);
+
+        const startPoint = new THREE.Vector3().addVectors(pointA, direction.clone().multiplyScalar(startLength));
+        const endPoint = new THREE.Vector3().addVectors(pointA, direction.clone().multiplyScalar(endLength));
+
+        const segmentLength = endPoint.distanceTo(startPoint);
+
+        if (segmentLength > 0) {
+          const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
+          const segmentDirection = new THREE.Vector3().subVectors(endPoint, startPoint);
+          const orientation = new THREE.Matrix4();
+          orientation.lookAt(startPoint, endPoint, new THREE.Object3D().up);
+          orientation.multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+
+          const cylinderGeometry = new THREE.CylinderGeometry(radius, radius, segmentLength, 8, 1, false);
+          const cylinder = new THREE.Mesh(cylinderGeometry, material);
+          cylinder.applyMatrix4(orientation);
+          cylinder.position.copy(midPoint);
+
+          dashedCylinders.add(cylinder);
+        }
+
+        currentLength += dashLength + gapLength;
+      }
+
+      return dashedCylinders;
+    }
+
+    // Function to load textures and create entities
+    function loadEntitiesAndRender() {
+      const promises = data.entities.map(entity => {
+        return new Promise((resolve, reject) => {
+          const textureLoader = new THREE.TextureLoader();
+          textureLoader.load(
+            entity.textureUrl,
+            function (texture) {
+              // Optional: Adjust texture settings
+              texture.minFilter = THREE.LinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+              texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+              const geometry = new THREE.BoxGeometry(1, 1, 1);
+
+              // Create outer cube with texture
+              const entityMaterial = new THREE.MeshBasicMaterial({
+                map: texture,
+                color: 0xffffff, // Set base color to white
+                transparent: true, // Enable transparency
+                alphaTest: 0.5
+              });
+              const cube = new THREE.Mesh(geometry, entityMaterial);
+              cube.position.set(entity.position.x, entity.position.y, entity.position.z);
+              scene.add(cube);
+
+              // Create inner cube with white color, slightly smaller
+              const innerGeometry = new THREE.BoxGeometry(0.98, 0.98, 0.98); // Slightly smaller
+              const innerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+              const innerCube = new THREE.Mesh(innerGeometry, innerMaterial);
+              innerCube.position.copy(cube.position);
+              scene.add(innerCube);
+
+              // Create edges for the outer cube
+              const edges = new THREE.EdgesGeometry(geometry);
+              const edgesMaterial = new THREE.LineBasicMaterial({
+                color: 0x000000,
+                depthTest: true,
+                depthWrite: true,
+                transparent: false,
+                side: THREE.FrontSide
+              });
+              const edgesMesh = new THREE.LineSegments(edges, edgesMaterial);
+              edgesMesh.position.copy(cube.position);
+              scene.add(edgesMesh);
+
+              entityObjects[entity.id] = cube;
+
+              resolve();
+            },
+            undefined,
+            function (err) {
+              console.error('An error occurred loading the texture:', err);
+              reject(err);
+            }
+          );
+        });
+      });
+
+      Promise.all(promises).then(() => {
+        // After all textures are loaded and entities are added
+        // Add connections to the scene
+        data.connections.forEach(connection => {
+          const fromEntity = entityObjects[connection.from];
+          const toEntity = entityObjects[connection.to];
+
+          const pointA = fromEntity.position.clone();
+          const pointB = toEntity.position.clone();
+
+          const dashSize = 0.2; // Length of each dash
+          const gapSize = 0.1; // Length of each gap
+          const radius = 0.05; // Thickness of the line
+          const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color
+
+          const dashedLine = createDashedLineBetweenPoints(pointA, pointB, dashSize, gapSize, radius, material);
+          scene.add(dashedLine);
+        });
+
+        // Render the scene
+        animate();
+      }).catch(err => {
+        console.error('Error loading entities:', err);
+      });
+    }
+
+    // Render the scene
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    loadEntitiesAndRender();
+
+    // Handle window resize
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+      const aspect = window.innerWidth / window.innerHeight;
+      camera.left = -d * aspect;
+      camera.right = d * aspect;
+      camera.top = d;
+      camera.bottom = -d;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  </script>
+</body>
+</html>
