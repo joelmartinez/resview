@@ -13,7 +13,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     
-
     class Resource {
       constructor(id, name, position, textureUrl, scene, renderer) {
         this.id = id;
@@ -40,16 +39,16 @@
 
               // Create outer cube with texture
               const entityMaterial = new THREE.MeshStandardMaterial({
-  map: texture,
-  color: 0xffffff,
-  metalness: 0.3,
-  roughness: 0.7,
-  transparent: true,
-  opacity: 1.0
-});
+                map: texture,
+                color: 0xffffff,
+                metalness: 0.3,
+                roughness: 0.7,
+                transparent: true,
+                opacity: 1.0
+              });
               const cube = new THREE.Mesh(geometry, entityMaterial);
-cube.castShadow = true;
-cube.receiveShadow = true;
+              cube.castShadow = true;
+              cube.receiveShadow = true;
               cube.position.set(this.position.x, this.position.y, this.position.z);
               this.scene.add(cube);
 
@@ -57,8 +56,8 @@ cube.receiveShadow = true;
               const innerGeometry = new THREE.BoxGeometry(0.98, 0.98, 0.98); // Slightly smaller
               const innerMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.3, roughness: 0.7 });
               const innerCube = new THREE.Mesh(innerGeometry, innerMaterial);
-innerCube.castShadow = true;
-innerCube.receiveShadow = true;
+              innerCube.castShadow = true;
+              innerCube.receiveShadow = true;
               innerCube.position.copy(cube.position);
               this.scene.add(innerCube);
 
@@ -147,6 +146,26 @@ innerCube.receiveShadow = true;
       }
     }
 
+    class CameraController {
+      constructor(camera, renderer) {
+        this.camera = camera;
+        this.renderer = renderer;
+        this.zoomSpeed = 0.5;
+
+        // Bind the wheel event for zooming
+        this.renderer.domElement.addEventListener('wheel', (event) => this.onMouseWheel(event), false);
+      }
+
+      onMouseWheel(event) {
+        event.preventDefault();
+
+        const delta = event.deltaY > 0 ? 1 : -1;
+        this.camera.zoom += delta * this.zoomSpeed * -0.1;
+        this.camera.zoom = Math.max(0.5, Math.min(5, this.camera.zoom)); // Limit zoom levels
+        this.camera.updateProjectionMatrix();
+      }
+    }
+
     // Set up the scene
     const scene = new THREE.Scene();
 
@@ -155,7 +174,7 @@ innerCube.receiveShadow = true;
 
     // Set up the renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = true;
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
@@ -169,19 +188,19 @@ renderer.shadowMap.enabled = true;
     camera.lookAt(0, 0, 0);
 
     // Add a directional light to simulate sunlight
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-directionalLight.position.set(-10, 10, 10); // Top left diagonal
-scene.add(directionalLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(-10, 10, 10); // Top left diagonal
+    scene.add(directionalLight);
 
-directionalLight.castShadow = true;
-directionalLight.shadow.mapSize.width = 1024;
-directionalLight.shadow.mapSize.height = 1024;
-directionalLight.shadow.camera.near = 0.1;
-directionalLight.shadow.camera.far = 50;
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 50;
 
-// Add ambient light for general lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
-scene.add(ambientLight);
+    // Add ambient light for general lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+    scene.add(ambientLight);
 
     // Data structure defining entities and connections
     const data = {
@@ -220,6 +239,9 @@ scene.add(ambientLight);
         const dashedLine = new DashedLine(fromEntity, toEntity, scene);
         dashedLine.create();
       });
+
+      // Initialize Camera Controller
+      const cameraController = new CameraController(camera, renderer);
 
       // Render the scene
       animate();
